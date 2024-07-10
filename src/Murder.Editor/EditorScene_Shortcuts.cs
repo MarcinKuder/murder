@@ -1,6 +1,8 @@
 ﻿using ImGuiNET;
 using Microsoft.Xna.Framework.Input;
 using Murder.Assets;
+using Murder.Assets.Graphics;
+using Murder.Attributes;
 using Murder.Core.Input;
 using Murder.Diagnostics;
 using Murder.Editor.ImGuiExtended;
@@ -26,7 +28,8 @@ public partial class EditorScene
     private readonly Dictionary<string, Shortcut> _shortcutSearchValues;
 
     private bool _commandPaletteIsVisible;
-
+    private bool _assetsPaletteIsVisible;
+    
     private ImmutableDictionary<ShortcutGroup, List<Shortcut>> CreateShortcutList() =>
         new Dictionary<ShortcutGroup, List<Shortcut>>
         {
@@ -78,7 +81,8 @@ public partial class EditorScene
             [
                 new ActionShortcut("Refresh Window", Keys.F4, RefreshEditorWindow),
                 new ActionShortcut("Run Diagnostics", new Chord(Keys.D, _leftOsActionModifier, Keys.LeftShift),  RunDiagnostics),
-                new ActionShortcut("Command Palette", new Chord(Keys.A, _leftOsActionModifier, Keys.LeftShift), ToggleCommandPalette)
+                new ActionShortcut("Command Palette", new Chord(Keys.A, _leftOsActionModifier, Keys.LeftShift), ToggleCommandPalette),
+                new ActionShortcut("Search assets", new Chord(Keys.P, _leftOsActionModifier), ToggleAssetsPalette)
             ],
             [ShortcutGroup.Publish] =
             [
@@ -87,10 +91,14 @@ public partial class EditorScene
         }.ToImmutableDictionary();
 
     private void ToggleCommandPalette()
-    {
+    {  
         _commandPaletteIsVisible = !_commandPaletteIsVisible;
     }
 
+    private void ToggleAssetsPalette()
+    {  
+        _assetsPaletteIsVisible = !_assetsPaletteIsVisible ;
+    }
     private void ToggleHotReloadShader(bool value)
     {
         Architect.EditorData.ToggleHotReloadShader(value);
@@ -165,6 +173,10 @@ public partial class EditorScene
             {
                 _commandPaletteIsVisible = false;
             }
+            if (_assetsPaletteIsVisible)
+            {
+                _assetsPaletteIsVisible = false;
+            }
             // Next we hide the logger.
             else if (GameLogger.IsShowing)
             {
@@ -210,15 +222,47 @@ public partial class EditorScene
             SearchBoxSettings<Shortcut> settings = new(initialText: "Type a command");
 
             if (SearchBox.Search(
-                $"command_palette", 
-                settings,
-                values: lazy,
-                flags: SearchBoxFlags.Unfolded,
-                sizeConfiguration: _commandPaletteSizeConfiguration, 
-                out Shortcut? shortcut))
+                    $"command_palette", 
+                    settings,
+                    values: lazy,
+                    flags: SearchBoxFlags.Unfolded,
+                    sizeConfiguration: _commandPaletteSizeConfiguration, 
+                    out Shortcut? shortcut))
             {
                 shortcut.Execute();
                 _commandPaletteIsVisible = false;
+            }
+            
+            ImGui.End();
+        }
+        
+        if (_assetsPaletteIsVisible)
+        {    
+            Vector2 viewportSize = ImGui.GetMainViewport().Size;
+
+            // Background of the command palette, slightly darker and prevents interaction with the editor.
+            ImGui.SetNextWindowBgAlpha(0.5f);
+            ImGui.Begin("Assets Palette Background", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize);
+            ImGui.SetWindowPos(Vector2.Zero);
+            ImGui.SetWindowSize(viewportSize);
+            ImGui.End();
+            
+            // Command palette window.
+            ImGui.Begin("Assets Palette",  ImGuiWindowFlags.Modal | ImGuiWindowFlags.NoDecoration);
+            ImGui.SetWindowPos((viewportSize - _commandPaletteWindowSize) / 2f);
+            ImGui.SetWindowPos((viewportSize - _commandPaletteWindowSize) / 2f);
+            ImGui.SetWindowSize(_commandPaletteWindowSize);
+            ImGui.SetWindowFocus();
+
+            var lazy = new Lazy<Dictionary<string, Shortcut>>(() => _shortcutSearchValues);
+
+            SearchBoxSettings<Shortcut> settings = new(initialText: "Search assets by name");
+            
+            Guid speakerGuid = Guid.Empty;
+            if (SearchBox.SearchAsset(ref speakerGuid, typeof(SpriteAsset), defaultText: "Default speaker"))
+            {
+                // shortcut.Execute();
+                _assetsPaletteIsVisible = false;
             }
             
             ImGui.End();
